@@ -1,37 +1,35 @@
 (ns borba.interceptors.registry
-  "Multimethod registry for Pedestal interceptors.
+  "The registry of the interceptors of a service, one `defmethod` per
+   interceptor, which `:service/interceptors` builds into a map.
 
-   ── Pattern ───────────────────────────────────────────────────────────────────
+     (defmethod registry/interceptor :log-request
+       [_ _components]
+       {:enter (fn [ctx]
+                 (log/info \"request\" (get-in ctx [:request :uri]))
+                 ctx)})
 
-   Define interceptors in your service by implementing this multimethod:
+   The dispatch value is the keyword that routes and handlers refer to the
+   interceptor by. The method returns a map with at least one stage:
 
-     (defmethod interceptors/interceptor :log-request [_ _]
-       {:enter log-request-enter})
+     :enter  (fn [ctx] ctx)        runs on the way in, in the order of the chain
+     :leave  (fn [ctx] ctx)        runs on the way out, in the reverse order
+     :error  (fn [ctx error] ctx)  runs when an interceptor throws
 
-     (defmethod interceptors/interceptor :require-content-type [_ _]
-       {:enter require-content-type-enter})
+   A stage can be a var, so that redefining its function at the REPL takes
+   effect. The :name of the interceptor is its dispatch value, so the method
+   does not give one.
 
-   The dispatch value is the keyword used to reference the interceptor in routes.
+   The method receives the components of the service, to close over what the
+   interceptor needs:
 
-   ── Return value ──────────────────────────────────────────────────────────────
-
-   The defmethod must return a map with at least one of:
-     :enter  — (fn [ctx] ctx)   runs before the handler (left → right)
-     :leave  — (fn [ctx] ctx)   runs after the handler  (right → left)
-     :error  — (fn [ctx ex] ctx) catches exceptions in the chain
-
-   The :name key is injected automatically by the component using the dispatch key.
-
-   ── If the interceptor needs config ──────────────────────────────────────────
-
-   Config is passed via Integrant through :service/interceptors init map.
-   Access it via the second arg (the full components map):
-
-     (defmethod interceptors/interceptor :rate-limit [_ {:keys [max-rps]}]
-       {:enter (fn [ctx] (check-rate! max-rps ctx))})")
+     (defmethod registry/interceptor :rate-limit
+       [_ {:keys [rate-limiter]}]
+       {:enter (fn [ctx] (rate-limiter/check! rate-limiter ctx))})")
 
 (defmulti interceptor
-  "Registry of all Pedestal interceptors.
-   Dispatch key is the interceptor keyword (e.g. :log-request).
-   Returns an interceptor map with :enter and/or :leave and/or :error."
+  "Builds the interceptor registered under a keyword, and returns it as a map
+   with :enter, :leave and/or :error.
+   - dispatch-key: the keyword that routes and handlers refer to it by
+   - components: the components of the service, as `:service/interceptors`
+     was given them"
   (fn [dispatch-key _components] dispatch-key))

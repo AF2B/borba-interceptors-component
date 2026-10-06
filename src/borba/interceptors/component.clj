@@ -1,36 +1,79 @@
 (ns borba.interceptors.component
-  "Integrant component that auto-discovers all registered interceptors.
+  "The Integrant component that builds every registered interceptor into one
+   map, from the keyword it is registered under to the interceptor:
 
-   ── How it works ──────────────────────────────────────────────────────────────
+     :service/interceptors {:components #ig/ref :service/components}
 
-   On init, this component calls (methods interceptors/interceptor) to discover
-   every defmethod registered under the multimethod. For each dispatch key it
-   calls the defmethod and injects :name, producing a complete Pedestal
-   interceptor map keyed by keyword.
+   Routes and handlers take that map as `:interceptors` and resolve the
+   keywords of their chains in it. The interceptors are found by the
+   `defmethod`s of borba.interceptors.registry/interceptor, so the namespaces
+   that register them must be loaded before the system starts: list them under
+   `:service/namespaces` of the configuration."
+  (:require
+   [borba.interceptors.registry :as registry]
+   [clojure.string :as str]
+   [clojure.tools.logging :as log]
+   [integrant.core :as ig]))
 
-   The resulting map is passed as :interceptors to :http/routes, which uses it
-   to resolve plain keywords in route tuples:
+(def ^:private stages [:enter :leave :error])
 
-     [\"/v1/users\" :post :user/create {:interceptors [:log-request :require-content-type]}]
+(defn- callable?
+  "Returns true for a function, or a var that holds one, as a stage."
+  [stage]
+  (or (fn? stage) (var? stage)))
 
-   ── System EDN ────────────────────────────────────────────────────────────────
+(defn- problem
+  "Returns what keeps an interceptor from running in a chain, as data, or nil
+   when it can run."
+  [interceptor]
+  (cond
+    (not (map? interceptor))
+    {:reason :not-a-map}
 
-     :service/interceptors {:components #ig/ref :components/all}
+    (not-any? #(contains? interceptor %) stages)
+    {:reason :no-stage}
 
-   ── Interceptor resolution in routes ─────────────────────────────────────────
+    :else
+    (when-let [stage (->> stages
+                          (filter #(contains? interceptor %))
+                          (remove #(callable? (get interceptor %)))
+                          first)]
+      {:reason :stage-not-callable
+       :stage  stage})))
 
-   borba-routes-component looks up each keyword in this map and inlines the
-   full interceptor map into the Pedestal route interceptor chain."
-  (:require [integrant.core :as ig]
-            [borba.interceptors.registry :as registry]))
+(defn- build-one
+  "Builds the interceptor registered under a key, and fails when it cannot run
+   in a chain."
+  [components
+   interceptor-key]
+  (let [interceptor (registry/interceptor interceptor-key components)]
+    (when-let [found (problem interceptor)]
+      (throw (ex-info (str "the interceptor " interceptor-key " is not valid: "
+                           (name (:reason found)))
+                      (assoc found
+                             :error       ::invalid-interceptor
+                             :interceptor interceptor-key))))
+    (assoc interceptor :name interceptor-key)))
 
-(defmethod ig/init-key :service/interceptors [_ {:keys [components]}]
-  (let [dispatch-keys (-> (methods registry/interceptor) keys)]
-    (reduce
-     (fn [acc k]
-       (let [interceptor-map (registry/interceptor k components)]
-         (assoc acc k (assoc interceptor-map :name k))))
-     {}
-     dispatch-keys)))
+(defn build
+  "Builds every registered interceptor and returns them in a map from the
+   keyword each is registered under to the interceptor, named by that keyword.
+   Fails naming the keyword of the first interceptor that cannot run in a chain,
+   which is a map with none of :enter, :leave and :error, or with one that is
+   not a function.
+   - components: the components of the service, handed to each interceptor
+     when it is built"
+  [components]
+  (let [registered (dissoc (methods registry/interceptor) :default)]
+    (into {}
+          (map (fn [interceptor-key]
+                 [interceptor-key (build-one components interceptor-key)]))
+          (keys registered))))
 
-(defmethod ig/halt-key! :service/interceptors [_ _] nil)
+(defmethod ig/init-key :service/interceptors
+  [_ {:keys [components]}]
+  (let [interceptors (build components)]
+    (log/infof "registered %d interceptor(s): %s"
+               (count interceptors)
+               (str/join ", " (sort (map str (keys interceptors)))))
+    interceptors))

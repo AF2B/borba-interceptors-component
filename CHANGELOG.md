@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-06
+
 ### Added
 
 - `borba.interceptors.component/build`, which builds every registered interceptor into a map, so a service or a test can do it
@@ -27,5 +29,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First release: the `borba.interceptors.registry/interceptor` multimethod and the `:service/interceptors` Integrant component.
 
-[Unreleased]: https://github.com/AF2B/borba-interceptors-component/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/AF2B/borba-interceptors-component/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/AF2B/borba-interceptors-component/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/AF2B/borba-interceptors-component/releases/tag/v1.0.0

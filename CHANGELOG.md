@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- A service that registers no interceptor logged `registered 0 interceptor(s): ` with a colon and nothing after it. It logs
+  `registered no interceptors`.
+
 ## [1.1.0] - 2026-10-06
 
 ### Added

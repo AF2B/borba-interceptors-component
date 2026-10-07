@@ -73,7 +73,9 @@
 (defmethod ig/init-key :service/interceptors
   [_ {:keys [components]}]
   (let [interceptors (build components)]
-    (log/infof "registered %d interceptor(s): %s"
-               (count interceptors)
-               (str/join ", " (sort (map str (keys interceptors)))))
+    (if (empty? interceptors)
+      (log/info "registered no interceptors")
+      (log/infof "registered %d interceptor(s): %s"
+                 (count interceptors)
+                 (str/join ", " (sort (map str (keys interceptors))))))
     interceptors))

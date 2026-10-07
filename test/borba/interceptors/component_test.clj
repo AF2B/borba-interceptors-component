@@ -138,4 +138,10 @@
           (is (= [(str "registered 2 interceptor(s): "
                        ":borba.interceptors.component-test/audit, "
                        ":borba.interceptors.component-test/log")]
-                 (logging/messages entries))))))))
+                 (logging/messages entries)))))))
+
+  (testing "says so, without a list, when it registered none"
+    (let [entries (logging/call-capturing
+                   #(ig/init {:service/interceptors {}}))]
+      (is (= ["registered no interceptors"]
+             (logging/messages entries))))))

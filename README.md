@@ -11,7 +11,7 @@ look it up in that map, so a service declares an interceptor once and uses it wh
 ```clojure
 io.github.af2b/borba-interceptors-component
 {:git/url "https://github.com/AF2B/borba-interceptors-component"
- :git/tag "v1.1.0"
+ :git/tag "v1.1.1"
  :git/sha "<the commit of the tag, printed in the release notes>"}
 ```
 
